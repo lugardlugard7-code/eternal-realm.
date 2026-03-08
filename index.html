@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Eternal Realm | Autonomous AI Sim</title>
+    <style>
+        body { background: #121212; color: #e0e0e0; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; }
+        #ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.8); padding: 15px; border: 2px solid #444; pointer-events: none; }
+        canvas { display: block; image-rendering: pixelated; background: #2d4c2e; margin: 0 auto; cursor: crosshair; }
+        #log { position: absolute; right: 10px; top: 10px; width: 300px; height: 90vh; background: rgba(0,0,0,0.8); padding: 10px; font-size: 12px; overflow-y: auto; border-left: 3px solid #666; }
+        .S-Rank { color: #f1c40f; font-weight: bold; }
+        .Abomination { color: #9b59b6; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <h2 style="margin:0; color:#8ad;">ETERNAL REALM AI</h2>
+    <div id="stats">Year: 0 | Pop: 0 | Kings: 0</div>
+    <div id="legend" style="font-size:10px; margin-top:5px;">
+        H: Human | G: Goblin | O: Orc | E: Elf | D: Dwarf | 🐉: Dragon
+    </div>
+</div>
+
+<div id="log"><b>--- World Chronicles ---</b></div>
+<canvas id="worldCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('worldCanvas');
+const ctx = canvas.getContext('2d');
+const logEl = document.getElementById('log');
+canvas.width = window.innerWidth - 320;
+canvas.height = window.innerHeight;
+
+// --- CONFIGURATION ---
+const SPECIES = {
+    HUMAN: { char: 'H', color: '#ffdbac' },
+    GOBLIN: { char: 'G', color: '#2ecc71' },
+    ORC: { char: 'O', color: '#1a5e1a' },
+    ELF: { char: 'E', color: '#f39c12' },
+    DWARF: { char: 'D', color: '#95a5a6' }
+};
+
+let entities = [];
+let structures = [];
+let year = 0;
+
+function addLog(msg, type="") {
+    const entry = document.createElement('div');
+    entry.className = type;
+    entry.innerHTML = `[Yr ${year}] ${msg}`;
+    logEl.prepend(entry);
+}
+
+
+
+class Entity {
+    constructor(x, y, species, lineage = "Commoner") {
+        this.x = x; this.y = y;
+        this.species = species;
+        this.lineage = lineage;
+        this.energy = 100;
+        this.age = 0;
+        this.iq = Math.random() * 100;
+        this.eq = Math.random() * 100;
+        this.renown = 0;
+        this.partner = null;
+        this.vocation = this.assignVocation();
+        this.alive = true;
+    }
+
+    assignVocation() {
+        if (this.iq > 80) return "Teacher";
+        if (this.iq > 60) return "Adventurer";
+        return "Hunter";
+    }
+
+    update() {
+        if (!this.alive) return;
+        this.age += 0.01;
+        this.energy -= 0.05;
+
+        // Autonomous Logic
+        if (this.energy < 40) this.seekFood();
+        else if (this.vocation === "Adventurer") this.goOnQuest();
+        else this.wander();
+
+        // Socializing & Marriage
+        this.findPartner();
+
+        if (this.energy <= 0 || this.age > 80) this.die();
+    }
+
+    seekFood() {
+        this.x += (Math.random() - 0.5) * 4;
+        this.y += (Math.random() - 0.5) * 4;
+        if (Math.random() > 0.98) this.energy += 30;
+    }
+
+    goOnQuest() {
+        this.x += (Math.random() - 0.5) * 6;
+        this.y += (Math.random() - 0.5) * 6;
+        this.renown += 0.1;
+    }
+
+    wander() {
+        this.x += (Math.random() - 0.5) * 2;
+        this.y += (Math.random() - 0.5) * 2;
+    }
+
+    findPartner() {
+        if (this.partner || this.age < 18) return;
+        let potential = entities.find(e => e !== this && e.alive && !e.partner && dist(this, e) < 20);
+        if (potential) {
+            this.partner = potential;
+            potential.partner = this;
+            let isAbomination = this.species !== potential.species;
+            let msg = `${this.species} ${this.name || 'Citizen'} married ${potential.species} ${potential.name || 'Citizen'}.`;
+            if (isAbomination) {
+                addLog("FORBIDDEN UNION: " + msg, "Abomination");
+            } else {
+                addLog(msg);
+            }
+        }
+    }
+
+    die() {
+        this.alive = false;
+        structures.push({x: this.x, y: this.y, type: 'Grave'});
+        addLog(`${this.species} ${this.vocation} died at age ${Math.floor(this.age)}.`);
+    }
+
+    draw() {
+        if (!this.alive) return;
+        ctx.fillStyle = SPECIES[this.species].color;
+        // Pixel Character Body
+        ctx.fillRect(this.x, this.y, 12, 12);
+        // "Head" dot
+        ctx.fillStyle = "black";
+        ctx.fillRect(this.x + 3, this.y + 2, 2, 2);
+        ctx.fillRect(this.x + 7, this.y + 2, 2, 2);
+        
+        ctx.font = "10px Arial";
+        ctx.fillStyle = "white";
+        ctx.fillText(SPECIES[this.species].char, this.x + 2, this.y - 2);
+    }
+}
+
+function dist(a, b) { return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2); }
+
+// Initialize World
+for (let i = 0; i < 30; i++) {
+    const sKeys = Object.keys(SPECIES);
+    const s = sKeys[Math.floor(Math.random() * sKeys.length)];
+    entities.push(new Entity(Math.random() * canvas.width, Math.random() * canvas.height, s));
+}
+
+function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw Grass Texture
+    ctx.fillStyle = "rgba(0,0,0,0.05)";
+    for(let i=0; i<canvas.width; i+=40) ctx.fillRect(i, 0, 1, canvas.height);
+
+    structures.forEach(s => {
+        ctx.fillStyle = s.type === 'Grave' ? '#7f8c8d' : '#f1c40f';
+        ctx.fillRect(s.x, s.y, 10, 10);
+    });
+
+    entities.forEach(e => {
+        e.update();
+        e.draw();
+    });
+
+    year += 0.01;
+    document.getElementById('stats').innerText = `Year: ${Math.floor(year)} | Pop: ${entities.filter(e=>e.alive).length} | Ruins: ${structures.length}`;
+    
+    requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
